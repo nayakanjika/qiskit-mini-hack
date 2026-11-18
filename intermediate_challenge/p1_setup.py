@@ -1,7 +1,7 @@
 """Shared setup for the Intermediate challenge (LiH), owned by Person 1.
 
 Teammates can do:
-    from p1_setup import *
+    from intermediate_challenge.p1_setup import *
     problem, mapper = reduced_lih(level="6q")   # or "4q", "full"
     qubit_op = mapper.map(problem.hamiltonian.second_q_op())
 
