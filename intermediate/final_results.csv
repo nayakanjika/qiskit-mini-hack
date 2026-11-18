@@ -1,0 +1,5 @@
+setup,qubits,CNOTs,meas_groups,err_mHa,notes,chem_acc
+Baseline: full JW + UCCSD,12,1572,136,0.0,reference; too costly to even run VQE here,True
+6q (freeze+parity+taper) + UCCSD,6,284,72,0.22788932536066397,noiseless; accurate along the whole bond curve,True
+4q (+ drop π pair) + hardware-efficient,4,6,25,1.2697962713605904,noiseless; fewest resources; only valid for d ≥ 1.3 Å,True
+"6q + doubles-only UCC + SPSA, with shots",6,280,72,1.3564043936780124,worst of 3 runs; ~2.0e+08 shots,True
