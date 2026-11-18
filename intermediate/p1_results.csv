@@ -1,7 +1,7 @@
 config,qubits,params,CNOTs,depth,pauli_terms,meas_groups,within_chem_acc,reduced_exact_err_mHa,vqe_err_mHa
-"Baseline (JW, 12q)",12,92,1572,3180,631,136,True,0.0,
-A: freeze core (JW),10,24,346,698,276,58,True,0.228,
-A+B: + parity,8,24,410,701,276,76,True,0.228,
-A+B+C: + tapering (6q),6,10,118,242,231,72,True,0.228,0.228
-D (naive): lowest 3 orbitals (3q),3,4,18,53,34,13,False,19.405,
-A+B+C+D: drop π pair (4q),4,8,72,162,100,25,True,1.252,1.252
+"Baseline (JW, 12q)",12,92,7520,9494,631,136,True,0.0,
+A: freeze core (JW),10,24,1520,1939,276,58,True,0.228,
+A+B: + parity,8,24,1212,1646,276,76,True,0.228,
+A+B+C: + tapering (6q),6,10,304,446,231,72,True,0.228,0.228
+D (naive): lowest 3 orbitals (3q),3,4,32,70,34,13,False,19.405,
+A+B+C+D: drop π pair (4q),4,8,172,291,100,25,True,1.252,1.252
