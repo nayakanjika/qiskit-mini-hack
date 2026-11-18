@@ -2,18 +2,26 @@
 
 Team **Qiskiteers**' work for the BasQ Qiskit Fall Fest 2026 hackathon.
 
-## Challenges
+## Repository layout
 
-- [`beginner_challenge/`](./beginner_challenge/): H₂ VQE tutorial and a HeH⁺ dissociation-curve exercise.
-- [`intermediate_challenge/`](./intermediate_challenge/): LiH qubit-reduction notebook, shared setup, and results.
+| Folder | File | What it is |
+|---|---|---|
+| [`beginner/`](./beginner/) | `challenge_1_tutorial qiskiteers.ipynb` | The H₂ VQE tutorial: a single-geometry introduction. Start here. |
+| | `heh_plus_dissociation.ipynb` | HeH⁺ dissociation curve |
+| [`intermediate/`](./intermediate/) | `p1_qubits.ipynb` | LiH baseline and qubit-reduction study |
+| | `p1_setup.py` | Shared LiH model, reduction levels, ansatz, resource counting and VQE helpers |
+| | `p1_results.csv` | Resource and accuracy results (the table below) |
+| | `p1_bond_scan.csv` | 6- and 4-qubit errors across LiH bond lengths |
 
-The beginner exercise uses STO-3G and scans the HeH⁺ bond length to estimate the equilibrium geometry, dissociation energy, and UCCSD/VQE accuracy against a particle-number-filtered exact reference.
+## Beginner: HeH⁺ dissociation curve
 
-The intermediate study applies qubit-reduction techniques to LiH at 1.6 Å in the STO-3G basis, with the goal of reducing quantum resources while staying within chemical accuracy (1.6 mHa).
+After the H₂ tutorial, `heh_plus_dissociation.ipynb` scans the HeH⁺ bond length to estimate the equilibrium geometry and dissociation energy, and compares UCCSD/VQE with a particle-number-constrained exact reference.
 
-## Intermediate results: reducing qubits
+It uses PySCF with the minimal STO-3G basis, Jordan–Wigner mapping, Hartree–Fock + UCCSD, and a noiseless statevector estimator. Its equilibrium and dissociation values are estimates within this model, not basis-set-limit or experimental values.
 
-Every error is measured against the exact energy of the full molecule.
+## Intermediate: LiH qubit reduction
+
+We apply qubit-reduction techniques to LiH at 1.6 Å in the STO-3G basis, aiming to reduce quantum resources while staying within chemical accuracy (1.6 mHa). Every error is measured against the exact energy of the full molecule.
 
 | Configuration | Qubits | Params | CNOTs | Depth | Error (mHa) | Chem. accurate |
 |---|---:|---:|---:|---:|---:|:---:|
@@ -24,14 +32,14 @@ Every error is measured against the exact energy of the full molecule.
 | Naive lowest-three-orbital active space | 3 | 4 | 18 | 53 | 19.405 | No |
 | Freeze core + parity + drop π pair | **4** | 8 | 72 | 162 | 1.252 | Yes |
 
-The 6-qubit reduction retains accuracy with far fewer CNOTs; the 4-qubit active-space model remains just inside chemical accuracy. The choice of orbitals matters: the naive lowest-three-orbital selection exceeds the accuracy target.
+The 6-qubit reduction keeps its accuracy with far fewer CNOTs, and the 4-qubit active-space model stays just inside chemical accuracy. The choice of orbitals matters: the naive lowest-three-orbital selection misses the accuracy target.
 
-## Intermediate shared setup
+### Using the shared setup
 
-Run notebooks with the repository root as the Jupyter working directory. Import the shared helper with:
+Run notebooks with the repository root as the Jupyter working directory, and import the shared helper with:
 
 ```python
-from intermediate_challenge.p1_setup import *
+from intermediate.p1_setup import *
 
 problem, mapper = reduced_lih(level="6q")  # "full" (12q), "6q" or "4q"
 qubit_op = mapper.map(problem.hamiltonian.second_q_op())
