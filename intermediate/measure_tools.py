@@ -1,12 +1,19 @@
 """Shot-based energy estimation for the Intermediate challenge.
 
 Instead of an exact (infinite-shot) estimator, we simulate a real device: the Hamiltonian's Pauli
-terms are split into qubit-wise commuting groups, each group is measured in one basis with a fixed
-number of shots, and every shot is counted towards the budget.
+terms are split into qubit-wise commuting groups, each group is measured in one basis with a share
+of the shot budget, and every shot is counted.
+
+Speed: everything that doesn't depend on the circuit parameters (basis rotations and the ±1 sign
+of every term for every possible outcome) is worked out once, so each energy evaluation is just
+one statevector simulation plus a few small matrix products.
 """
 import numpy as np
 from qiskit import QuantumCircuit
-from qiskit.quantum_info import Statevector
+from qiskit import transpile
+from qiskit.quantum_info import Statevector, Operator
+
+SIM_GATES = ["cx", "rz", "ry", "rx", "sx", "x", "h", "s", "sdg"]
 
 
 def measurement_groups(qubit_op):
@@ -29,46 +36,56 @@ def _basis_change(group, n):
     return qc
 
 
+def _sign_matrix(labels, n):
+    """signs[t, o] = ±1: value of term t's Z-string on measurement outcome o (an integer bitstring)."""
+    outcomes = np.arange(2 ** n)
+    signs = np.empty((len(labels), 2 ** n))
+    for t, l in enumerate(labels):
+        mask = sum(1 << (n - 1 - i) for i, ch in enumerate(l) if ch != "I")
+        parity = np.array([bin(o & mask).count("1") & 1 for o in outcomes])
+        signs[t] = 1 - 2 * parity
+    return signs
+
+
 class ShotEstimator:
     """Estimate <H> with a fixed shot budget per energy evaluation, and count every shot.
 
-    allocation="uniform":  the budget is split equally between measurement groups.
-    allocation="weighted": groups with bigger coefficients get more shots (shots ∝ sum |c| in the
-                           group), which lowers the statistical error for the same budget.
+    The budget is split equally between the measurement groups.
     """
 
-    def __init__(self, ansatz, qubit_op, shots_per_eval, allocation="uniform", seed=None):
-        self.ansatz = ansatz
-        self.n = qubit_op.num_qubits
-        groups = measurement_groups(qubit_op)
-        self.identity = sum(g.coeffs.real.sum() for g in groups
-                            if all(set(l) == {"I"} for l in g.paulis.to_labels()))
-        self.groups = [g for g in groups
-                       if not all(set(l) == {"I"} for l in g.paulis.to_labels())]
-        weights = (np.ones(len(self.groups)) if allocation == "uniform"
-                   else np.array([np.abs(g.coeffs.real).sum() for g in self.groups]))
-        self.shots = np.maximum(1, np.round(shots_per_eval * weights / weights.sum())).astype(int)
+    def __init__(self, ansatz, qubit_op, shots_per_eval, seed=None):
+        self.ansatz = transpile(ansatz, basis_gates=SIM_GATES, optimization_level=1)  # simulate fast
+        n = qubit_op.num_qubits
+        self.identity = 0.0
+        self.rotations, self.weights = [], []
+        for g in measurement_groups(qubit_op):
+            labels = g.paulis.to_labels()
+            coeffs = g.coeffs.real
+            keep = [i for i, l in enumerate(labels) if set(l) != {"I"}]
+            self.identity += coeffs.sum() - coeffs[keep].sum()   # identity needs no measurement
+            if not keep:
+                continue
+            self.rotations.append(Operator(_basis_change(g, n)).data)
+            # coeffs @ signs: the energy contribution of each possible outcome, per shot
+            self.weights.append(coeffs[keep] @ _sign_matrix([labels[i] for i in keep], n))
+        self.shots = max(1, round(shots_per_eval / len(self.rotations)))
         self.rng = np.random.default_rng(seed)
-        self.rotations = [_basis_change(g, self.n) for g in self.groups]
         self.shots_used = 0
         self.evaluations = 0
 
     def energy(self, params):
-        state = Statevector(self.ansatz.assign_parameters(params))
-        total = self.identity                                # identity term needs no measurement
-        for group, rot, shots in zip(self.groups, self.rotations, self.shots):
-            probs = state.evolve(rot).probabilities()        # index = bitstring as integer
-            counts = self.rng.multinomial(shots, probs / probs.sum())
-            self.shots_used += shots
-            outcomes = np.nonzero(counts)[0]
-            for l, c in zip(group.paulis.to_labels(), group.coeffs.real):
-                mask = sum(1 << (self.n - 1 - i) for i, ch in enumerate(l) if ch != "I")
-                signs = np.array([(-1) ** bin(o & mask).count("1") for o in outcomes])
-                total += c * (signs @ counts[outcomes]) / shots
+        psi = Statevector(self.ansatz.assign_parameters(params)).data
+        total = self.identity
+        for U, w in zip(self.rotations, self.weights):
+            probs = np.abs(U @ psi) ** 2
+            counts = self.rng.multinomial(self.shots, probs / probs.sum())
+            total += w @ counts / self.shots
+        self.shots_used += self.shots * len(self.rotations)
         self.evaluations += 1
         return total
 
 
 def exact_expectation(ansatz, qubit_op, params):
     """Noise-free <H> at given parameters (used to judge how good the optimised parameters are)."""
-    return Statevector(ansatz.assign_parameters(params)).expectation_value(qubit_op).real
+    circ = transpile(ansatz, basis_gates=SIM_GATES, optimization_level=1)
+    return Statevector(circ.assign_parameters(params)).expectation_value(qubit_op).real

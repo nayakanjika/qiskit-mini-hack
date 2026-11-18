@@ -8,6 +8,7 @@ Teammates can do:
 so everyone works on exactly the same molecule, exact energy and resource counting.
 """
 import numpy as np
+from functools import lru_cache
 from qiskit import transpile
 from qiskit_nature.units import DistanceUnit
 from qiskit_nature.second_q.drivers import PySCFDriver
@@ -24,8 +25,10 @@ BOND_LENGTH = 1.6          # Angstrom, close to LiH equilibrium
 BASIS = "sto3g"
 CHEM_ACC = 1.6e-3          # Hartree
 BASIS_GATES = ["cx", "rz", "sx", "x"]
+SIM_GATES = ["cx", "rz", "ry", "rx", "sx", "x", "h", "s", "sdg"]   # for fast simulation only
 
 
+@lru_cache(maxsize=None)
 def lih_problem(bond_length=BOND_LENGTH, basis=BASIS):
     """Full LiH electronic-structure problem (6 spatial orbitals, 12 spin-orbitals)."""
     driver = PySCFDriver(
@@ -37,11 +40,21 @@ def lih_problem(bond_length=BOND_LENGTH, basis=BASIS):
 
 def exact_energy(problem, mapper=None):
     """Exact total ground-state energy of `problem` (classical diagonalisation)."""
+    key = (id(problem), id(mapper))
+    if key in _EXACT_CACHE:
+        return _EXACT_CACHE[key][2]
     mapper = mapper or JordanWignerMapper()
     solver = GroundStateEigensolver(mapper, NumPyMinimumEigensolver())
-    return solver.solve(problem).total_energies[0]
+    energy = solver.solve(problem).total_energies[0]
+    # keep references to problem and mapper so their ids can never be reused by new objects
+    _EXACT_CACHE[key] = (problem, mapper, energy)
+    return energy
 
 
+_EXACT_CACHE = {}   # cached problems are reused, so their exact energies can be too
+
+
+@lru_cache(maxsize=None)
 def reduced_lih(level="6q", bond_length=BOND_LENGTH):
     """Return (problem, mapper) for a chosen reduction level.
 
@@ -84,8 +97,14 @@ def measure_resources(ansatz, qubit_op, label=""):
     }
 
 
+def fast(circuit):
+    """Compile a circuit to basic gates once. The result is identical, but simulating it is ~20x
+    faster than simulating high-level UCC blocks. Parameters keep their names and order."""
+    return transpile(circuit, basis_gates=SIM_GATES, optimization_level=1)
+
+
 def run_vqe(problem, mapper, ansatz, optimizer=None):
     """Noiseless VQE; returns the total energy (nuclear repulsion and frozen core included)."""
-    vqe = VQE(StatevectorEstimator(), ansatz, optimizer or SLSQP(maxiter=300))
+    vqe = VQE(StatevectorEstimator(), fast(ansatz), optimizer or SLSQP(maxiter=300))
     vqe.initial_point = np.zeros(ansatz.num_parameters)
     return GroundStateEigensolver(mapper, vqe).solve(problem).total_energies[0]
