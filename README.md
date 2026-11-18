@@ -12,6 +12,7 @@ Team **Qiskiteers**' work for the BasQ Qiskit Fall Fest 2026 hackathon.
 | | `p1_setup.py` | Shared LiH model, reduction levels, ansatz, resource counting and VQE helpers |
 | | `p1_results.csv` | Resource and accuracy results (the table below) |
 | | `p1_bond_scan.csv` | 6- and 4-qubit errors across LiH bond lengths |
+| [`advanced_challenge/`](./advanced_challenge/) | `h4_qsci.ipynb` | Quantum-selected configuration interaction for stretched H₄ |
 
 ## Beginner: HeH⁺ dissociation curve
 
@@ -46,9 +47,13 @@ qubit_op = mapper.map(problem.hamiltonian.second_q_op())
 ansatz = build_ansatz(problem, mapper)
 ```
 
+## Advanced: quantum-selected configuration interaction
+
+[`advanced_challenge/h4_qsci.ipynb`](./advanced_challenge/h4_qsci.ipynb) samples determinants from a shallow UCCSD trial circuit for stretched square H₄ and classically diagonalizes the Hamiltonian in the sampled subspace. This small, noiseless STO-3G example illustrates the hybrid workflow; it is not a scalability or quantum-advantage claim.
+
 ## Requirements
 
-Python 3.10+ with `qiskit`, `qiskit-nature`, `qiskit-algorithms`, `pyscf`, `numpy`, and `matplotlib`.
+Python 3.10+ with `qiskit`, `qiskit-nature`, `qiskit-algorithms`, `pyscf`, `numpy`, `pandas`, and `matplotlib`.
 
 ## Credits
 
